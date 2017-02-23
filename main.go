@@ -153,26 +153,32 @@ func main() {
 	solve(V, E, R, C, X, Videos, Endpoints, Predictions)
 }
 
+func removeVidFromEnpoints(ci int, vi int) {
+	for _, ei := range Caches[ci].Endpoints {
+		delete(Endpoints[ei].P, vi)
+	}
+}
+
 func solve(V, E, R, C, X int, Videos []int, Endpoints []Endpoint, Predictions []Prediction) interface{} {
 	//
 
 	AddPredictions()
 
-	fmt.Printf("V %d E %d R %d C %d X %d\n\n", V, E, R, C, X)
-	fmt.Printf("Videos: %v\n\nEndpoints: %+v\n\nPredictions: %+v\n\n", Videos, Endpoints, Predictions)
+	// fmt.Printf("V %d E %d R %d C %d X %d\n\n", V, E, R, C, X)
+	// fmt.Printf("Videos: %v\n\nEndpoints: %+v\n\nPredictions: %+v\n\n", Videos, Endpoints, Predictions)
 
 	Caches = CacheFromEndpoints(C, Endpoints)
-	fmt.Printf("Caches: %v\n\n", Caches)
+	// fmt.Printf("Caches: %v\n\n", Caches)
 
 	cacheSorted := CacheInts()
 	sort.Sort(CacheByEndpoint(cacheSorted))
-	fmt.Printf("Caches order: %v\n\n", cacheSorted)
+	// fmt.Printf("Caches order: %v\n\n", cacheSorted)
 
 	fmt.Fprintf(output, "%d\n", C)
 	for _, ci := range cacheSorted {
 		fmt.Fprintf(output, "%d", ci)
 		iVids := interestingVids(ci)
-		fmt.Printf("Interesting vids: %v\n\n", iVids)
+		// fmt.Printf("Interesting vids: %v\n\n", iVids)
 		sizeCache := X
 		for _, iv := range iVids {
 			if Videos[iv.idvideo] > sizeCache {
@@ -180,6 +186,8 @@ func solve(V, E, R, C, X int, Videos []int, Endpoints []Endpoint, Predictions []
 			}
 			fmt.Fprintf(output, " %d", iv.idvideo)
 			sizeCache -= Videos[iv.idvideo]
+			// Remove from endpoints
+			removeVidFromEnpoints(ci, iv.idvideo)
 		}
 		fmt.Fprintf(output, "\n")
 	}
