@@ -28,10 +28,6 @@ type Prediction struct {
 	v, e, n int
 }
 
-type Cache struct {
-	vi int
-}
-
 type PredictionByImportance []Prediction
 
 func (p PredictionByImportance) Len() int {
@@ -43,8 +39,8 @@ func (p PredictionByImportance) Swap(i, j int) {
 }
 
 func (p PredictionByImportance) Less(i, j int) bool {
-	scorei := p[i].n * Endpoints[p[i].e]
-	scorej := p[j].n * Endpoints[p[j].e]
+	scorei := p[i].n * Endpoints[p[i].e].Ld
+	scorej := p[j].n * Endpoints[p[j].e].Ld
 	return scorei < scorej
 }
 
@@ -100,34 +96,102 @@ func main() {
 		Predictions[i] = Prediction{v, e, n}
 	}
 
-	solve(V, E, R, C, X, Videos, Endpoints, Predictions)
+	solve()
 }
 
-func removeVidFromEnpoints(ci int, vi int) {
-	for _, ei := range Caches[ci].Endpoints {
-		delete(Endpoints[ei].P, vi)
+type Cache struct {
+	size int
+	v    []int
+}
+
+func createCaches() {
+	Caches = make([]Cache, C)
+	for i := 0; i < C; i++ {
+		Caches[i] = Cache{X, nil}
 	}
+}
+
+func sizeLeft() int {
+	ret := 0
+	for _, c := range Caches {
+		ret += X - c.size
+	}
+	return ret
+}
+
+func inCache(ci int, vi int) bool {
+	ret := false
+	for _, cvi := range Caches[ci].v {
+		if cvi == vi {
+			ret = true
+		}
+	}
+	return ret
 }
 
 func solve() interface{} {
 	//
 
-	sort.Sort(PredictionByImportance(Predictions))
+	// fmt.Printf("Videos: %+v\n", Videos)
+	// fmt.Printf("Predictions: %+v\n", Predictions)
+	createCaches()
 
-	fmt.Fprintf(output, "%d\n", C)
-	for _, ci := range cacheSorted {
-		fmt.Fprintf(output, "%d", ci)
-		iVids := interestingVids(ci)
-		// fmt.Printf("Interesting vids: %v\n\n", iVids)
-		sizeCache := X
-		for _, iv := range iVids {
-			if Videos[iv] > sizeCache {
+	totalLeft := sizeLeft()
+	previousLeft := totalLeft + 1
+	counter := 0
+
+	for {
+		sort.Sort(PredictionByImportance(Predictions))
+
+		pChosen := Predictions[0]
+		// fmt.Printf("pChosen: %+v\n", pChosen)
+		// fmt.Println(len(Videos))
+		// fmt.Println(Endpoints[pChosen.e])
+
+		minCacheId := -1
+		minCacheLat := -1
+		for cid, clat := range Endpoints[pChosen.e].Lc {
+			// fmt.Printf("Caches: %+v\n", Caches)
+			// return 0
+			// fmt.Println("cid:", cid, "; Caches:", Caches)
+			if Caches[cid].size < Videos[pChosen.v] {
 				continue
 			}
-			fmt.Fprintf(output, " %d", iv)
-			sizeCache -= Videos[iv]
-			// Remove from endpoints
-			removeVidFromEnpoints(ci, iv)
+			if inCache(cid, pChosen.v) {
+				continue
+			}
+
+			if minCacheLat == -1 || minCacheLat > clat {
+				minCacheId = cid
+				minCacheLat = clat
+			}
+		}
+
+		if minCacheId != -1 {
+			Caches[minCacheId].v = append(Caches[minCacheId].v, pChosen.v)
+			Caches[minCacheId].size -= Videos[pChosen.v]
+
+			Predictions = Predictions[1:]
+		}
+
+		previousLeft = totalLeft
+		totalLeft = sizeLeft()
+
+		if totalLeft == previousLeft {
+			counter++
+			if counter > 5 {
+				break
+			}
+		} else {
+			counter = 0
+		}
+	}
+
+	fmt.Fprintf(output, "%d\n", C)
+	for ci, c := range Caches {
+		fmt.Fprintf(output, "%d", ci)
+		for _, vi := range c.v {
+			fmt.Fprintf(output, " %d", vi)
 		}
 		fmt.Fprintf(output, "\n")
 	}
