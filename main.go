@@ -22,7 +22,6 @@ var Caches []Cache
 type Endpoint struct {
 	Ld int         // Latency to datacenter
 	Lc map[int]int // Caches: id -> Lc
-	P  map[int]int // Predictions: id video -> number of view
 }
 
 type Prediction struct {
@@ -30,92 +29,23 @@ type Prediction struct {
 }
 
 type Cache struct {
-	Endpoints []int
+	vi int
 }
 
-func CacheInts() []int {
-	ret := make([]int, C)
-	for i := 0; i < C; i++ {
-		ret[i] = i
-	}
-	return ret
+type PredictionByImportance []Prediction
+
+func (p PredictionByImportance) Len() int {
+	return len(p)
 }
 
-type CacheByEndpoint []int
-
-func (c CacheByEndpoint) Len() int {
-	return len(c)
+func (p PredictionByImportance) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
 }
 
-func (c CacheByEndpoint) Swap(i, j int) {
-	c[i], c[j] = c[j], c[i]
-}
-
-func (c CacheByEndpoint) Less(i, j int) bool {
-	return len(Caches[c[i]].Endpoints) < len(Caches[c[j]].Endpoints)
-}
-
-func CacheFromEndpoints(C int, E []Endpoint) []Cache {
-	ret := make([]Cache, C)
-
-	for i, e := range E {
-		for c, _ := range e.Lc {
-			ret[c].Endpoints = append(ret[c].Endpoints, i)
-		}
-	}
-	return ret
-}
-
-// Add predictions to E
-func AddPredictions() {
-	for _, p := range Predictions {
-		Endpoints[p.e].P[p.v] = p.n
-	}
-}
-
-type weightvideo struct {
-	idvideo int
-	weight  int
-}
-
-type ByWeight []weightvideo
-
-func (a ByWeight) Len() int           { return len(a) }
-func (a ByWeight) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByWeight) Less(i, j int) bool { return a[i].weight < a[j].weight }
-
-func removeDuplicates(a []int) []int {
-	result := []int{}
-	seen := map[int]int{}
-	for _, val := range a {
-		if _, ok := seen[val]; !ok {
-			result = append(result, val)
-			seen[val] = val
-		}
-	}
-	return result
-}
-
-func interestingVids(idcache int) (idvids []int) {
-	var videos []weightvideo
-
-	for iEndpoint := range Caches[idcache].Endpoints {
-		// from Predictions, extract the videos for a given endpoint
-		e := &Endpoints[iEndpoint]
-		for idvideo, n := range e.P {
-			videos = append(videos, weightvideo{idvideo, n * (e.Ld - e.Lc[idcache])})
-		}
-	}
-
-	sort.Sort(ByWeight(videos))
-
-	for _, iv := range videos {
-		idvids = append(idvids, iv.idvideo)
-	}
-
-	idvids = removeDuplicates(idvids)
-
-	return idvids
+func (p PredictionByImportance) Less(i, j int) bool {
+	scorei := p[i].n * Endpoints[p[i].e]
+	scorej := p[j].n * Endpoints[p[j].e]
+	return scorei < scorej
 }
 
 func main() {
@@ -158,7 +88,7 @@ func main() {
 			cid := readInt()
 			C[cid] = readInt()
 		}
-		Endpoints[i] = Endpoint{Ld, C, make(map[int]int)}
+		Endpoints[i] = Endpoint{Ld, C}
 	}
 
 	// Predictions
@@ -179,20 +109,10 @@ func removeVidFromEnpoints(ci int, vi int) {
 	}
 }
 
-func solve(V, E, R, C, X int, Videos []int, Endpoints []Endpoint, Predictions []Prediction) interface{} {
+func solve() interface{} {
 	//
 
-	AddPredictions()
-
-	// fmt.Printf("V %d E %d R %d C %d X %d\n\n", V, E, R, C, X)
-	// fmt.Printf("Videos: %v\n\nEndpoints: %+v\n\nPredictions: %+v\n\n", Videos, Endpoints, Predictions)
-
-	Caches = CacheFromEndpoints(C, Endpoints)
-	// fmt.Printf("Caches: %v\n\n", Caches)
-
-	cacheSorted := CacheInts()
-	sort.Sort(CacheByEndpoint(cacheSorted))
-	// fmt.Printf("Caches order: %v\n\n", cacheSorted)
+	sort.Sort(PredictionByImportance(Predictions))
 
 	fmt.Fprintf(output, "%d\n", C)
 	for _, ci := range cacheSorted {
