@@ -82,9 +82,23 @@ type ByWeight []weightvideo
 
 func (a ByWeight) Len() int           { return len(a) }
 func (a ByWeight) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByWeight) Less(i, j int) bool { return a[i].weight > a[j].weight }
+func (a ByWeight) Less(i, j int) bool { return a[i].weight < a[j].weight }
 
-func interestingVids(idcache int) (videos []weightvideo) {
+func removeDuplicates(a []int) []int {
+	result := []int{}
+	seen := map[int]int{}
+	for _, val := range a {
+		if _, ok := seen[val]; !ok {
+			result = append(result, val)
+			seen[val] = val
+		}
+	}
+	return result
+}
+
+func interestingVids(idcache int) (idvids []int) {
+	var videos []weightvideo
+
 	for iEndpoint := range Caches[idcache].Endpoints {
 		// from Predictions, extract the videos for a given endpoint
 		e := &Endpoints[iEndpoint]
@@ -95,7 +109,13 @@ func interestingVids(idcache int) (videos []weightvideo) {
 
 	sort.Sort(ByWeight(videos))
 
-	return videos
+	for _, iv := range videos {
+		idvids = append(idvids, iv.idvideo)
+	}
+
+	idvids = removeDuplicates(idvids)
+
+	return idvids
 }
 
 func main() {
@@ -181,13 +201,13 @@ func solve(V, E, R, C, X int, Videos []int, Endpoints []Endpoint, Predictions []
 		// fmt.Printf("Interesting vids: %v\n\n", iVids)
 		sizeCache := X
 		for _, iv := range iVids {
-			if Videos[iv.idvideo] > sizeCache {
+			if Videos[iv] > sizeCache {
 				continue
 			}
-			fmt.Fprintf(output, " %d", iv.idvideo)
-			sizeCache -= Videos[iv.idvideo]
+			fmt.Fprintf(output, " %d", iv)
+			sizeCache -= Videos[iv]
 			// Remove from endpoints
-			removeVidFromEnpoints(ci, iv.idvideo)
+			removeVidFromEnpoints(ci, iv)
 		}
 		fmt.Fprintf(output, "\n")
 	}
