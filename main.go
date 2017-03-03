@@ -114,6 +114,41 @@ func calculateGains() {
 	}
 }
 
+func updateGains(ciu, viu int) {
+	if HighestGain.cache == ciu || HighestGain.video == viu {
+		HighestGain = Gain{-1, 0, 0}
+	}
+
+	for ci, c := range Caches {
+		es := c.e
+		for vi, v := range Videos {
+			if ci != ciu && vi != viu {
+				continue
+			}
+			if v > c.size || inCache(ci, vi) {
+				continue
+			}
+
+			g := 0
+			for e, elc := range es {
+				if n, ok := Endpoints[e].P[vi]; ok {
+					diff := n * (Endpoints[e].Ld - elc)
+					if diff < 0 {
+						continue
+					}
+					g += diff
+				}
+			}
+			gain := Gain{g, vi, ci}
+			Gains = append(Gains, gain)
+
+			if g > HighestGain.value {
+				HighestGain = gain
+			}
+		}
+	}
+}
+
 func main() {
 	sample := os.Args[1]
 	fileIn := sample + ".in"
@@ -180,8 +215,8 @@ func solve() interface{} {
 	previousLeft := totalLeft + 1
 	counter := 0
 
+	calculateGains()
 	for {
-		calculateGains()
 		if HighestGain.value == -1 {
 			break
 		}
@@ -205,8 +240,8 @@ func solve() interface{} {
 		fmt.Println(totalLeft, "/", X*C)
 		// fmt.Println(Caches)
 		if totalLeft == previousLeft {
-			fmt.Println("Caches:", Caches)
-			fmt.Println("HighestGain:", HighestGain)
+			// fmt.Println("Caches:", Caches)
+			// fmt.Println("HighestGain:", HighestGain)
 			counter++
 			if counter > 5 {
 				break
@@ -214,6 +249,8 @@ func solve() interface{} {
 		} else {
 			counter = 0
 		}
+
+		updateGains(HighestGain.cache, HighestGain.video)
 	}
 
 	fmt.Fprintf(output, "%d\n", C)
