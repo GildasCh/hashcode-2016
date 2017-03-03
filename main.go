@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"sort"
 )
 
 var input *os.File
@@ -17,31 +16,102 @@ var X int
 var Videos []int
 var Endpoints []Endpoint
 var Predictions []Prediction
-var Caches []Cache
 
 type Endpoint struct {
 	Ld int         // Latency to datacenter
 	Lc map[int]int // Caches: id -> Lc
+	P  map[int]int // Predictions: vi -> n
 }
 
 type Prediction struct {
 	v, e, n int
 }
 
-type PredictionByImportance []Prediction
-
-func (p PredictionByImportance) Len() int {
-	return len(p)
+type Cache struct {
+	size int
+	v    []int
+	e    map[int]int
 }
 
-func (p PredictionByImportance) Swap(i, j int) {
-	p[i], p[j] = p[j], p[i]
+var Caches []Cache
+
+func createCaches() {
+	Caches = make([]Cache, C)
+	for i := 0; i < C; i++ {
+		Caches[i] = Cache{X, nil, make(map[int]int)}
+	}
+
+	// Adding endpoints
+	for ei, e := range Endpoints {
+		for ci, lc := range e.Lc {
+			Caches[ci].e[ei] = lc
+		}
+	}
 }
 
-func (p PredictionByImportance) Less(i, j int) bool {
-	scorei := p[i].n * Endpoints[p[i].e].Ld
-	scorej := p[j].n * Endpoints[p[j].e].Ld
-	return scorei < scorej
+func sizeLeft() int {
+	ret := 0
+	for _, c := range Caches {
+		ret += X - c.size
+	}
+	return ret
+}
+
+func inCache(ci int, vi int) bool {
+	ret := false
+	for _, cvi := range Caches[ci].v {
+		if cvi == vi {
+			ret = true
+		}
+	}
+	return ret
+}
+
+type Gain struct {
+	value        int
+	video, cache int
+}
+
+var Gains []Gain
+var HighestGain Gain
+
+// type GainByImportance []Gain
+
+// func (g GainByImportance) Len() int { return len(g) }
+
+// func (g GainByImportance) Swap(i, j int) { g[i], g[j] = g[j], g[i] }
+
+// func (g GainByImportance) Less(i, j int) bool { return g[i].value < g[j].value }
+
+func calculateGains() {
+	Gains = nil
+	HighestGain = Gain{-1, 0, 0}
+
+	for ci, c := range Caches {
+		es := c.e
+		for vi, v := range Videos {
+			if v > c.size || inCache(ci, vi) {
+				continue
+			}
+
+			g := 0
+			for e, elc := range es {
+				if n, ok := Endpoints[e].P[vi]; ok {
+					diff := n * (Endpoints[e].Ld - elc)
+					if diff < 0 {
+						continue
+					}
+					g += diff
+				}
+			}
+			gain := Gain{g, vi, ci}
+			Gains = append(Gains, gain)
+
+			if g > HighestGain.value {
+				HighestGain = gain
+			}
+		}
+	}
 }
 
 func main() {
@@ -84,7 +154,7 @@ func main() {
 			cid := readInt()
 			C[cid] = readInt()
 		}
-		Endpoints[i] = Endpoint{Ld, C}
+		Endpoints[i] = Endpoint{Ld, C, make(map[int]int)}
 	}
 
 	// Predictions
@@ -94,46 +164,16 @@ func main() {
 		e := readInt()
 		n := readInt()
 		Predictions[i] = Prediction{v, e, n}
+		Endpoints[e].P[v] = n
 	}
 
 	solve()
 }
-
-type Cache struct {
-	size int
-	v    []int
-}
-
-func createCaches() {
-	Caches = make([]Cache, C)
-	for i := 0; i < C; i++ {
-		Caches[i] = Cache{X, nil}
-	}
-}
-
-func sizeLeft() int {
-	ret := 0
-	for _, c := range Caches {
-		ret += X - c.size
-	}
-	return ret
-}
-
-func inCache(ci int, vi int) bool {
-	ret := false
-	for _, cvi := range Caches[ci].v {
-		if cvi == vi {
-			ret = true
-		}
-	}
-	return ret
-}
-
 func solve() interface{} {
-	//
-
 	// fmt.Printf("Videos: %+v\n", Videos)
+	// fmt.Printf("Endpoints: %+v\n", Endpoints)
 	// fmt.Printf("Predictions: %+v\n", Predictions)
+
 	createCaches()
 
 	totalLeft := sizeLeft()
@@ -141,43 +181,32 @@ func solve() interface{} {
 	counter := 0
 
 	for {
-		sort.Sort(PredictionByImportance(Predictions))
-
-		pChosen := Predictions[0]
-		// fmt.Printf("pChosen: %+v\n", pChosen)
-		// fmt.Println(len(Videos))
-		// fmt.Println(Endpoints[pChosen.e])
-
-		minCacheId := -1
-		minCacheLat := -1
-		for cid, clat := range Endpoints[pChosen.e].Lc {
-			// fmt.Printf("Caches: %+v\n", Caches)
-			// return 0
-			// fmt.Println("cid:", cid, "; Caches:", Caches)
-			if Caches[cid].size < Videos[pChosen.v] {
-				continue
-			}
-			if inCache(cid, pChosen.v) {
-				continue
-			}
-
-			if minCacheLat == -1 || minCacheLat > clat {
-				minCacheId = cid
-				minCacheLat = clat
-			}
+		calculateGains()
+		if HighestGain.value == -1 {
+			break
 		}
+		// fmt.Println(HighestGain)
 
-		if minCacheId != -1 {
-			Caches[minCacheId].v = append(Caches[minCacheId].v, pChosen.v)
-			Caches[minCacheId].size -= Videos[pChosen.v]
-
-			Predictions = Predictions[1:]
+		// fmt.Println("HighestGain:", HighestGain)
+		// fmt.Println("Gains:", Gains)
+		Caches[HighestGain.cache].v = append(Caches[HighestGain.cache].v, HighestGain.video)
+		Caches[HighestGain.cache].size -= Videos[HighestGain.video]
+		if Caches[HighestGain.cache].size < 0 {
+			fmt.Println()
+			fmt.Println()
+			fmt.Println(Caches)
+			fmt.Println(HighestGain)
+			return nil
 		}
 
 		previousLeft = totalLeft
 		totalLeft = sizeLeft()
 
+		fmt.Println(totalLeft, "/", X*C)
+		// fmt.Println(Caches)
 		if totalLeft == previousLeft {
+			fmt.Println("Caches:", Caches)
+			fmt.Println("HighestGain:", HighestGain)
 			counter++
 			if counter > 5 {
 				break
