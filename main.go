@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
+
+	"github.com/gildasch/go-algos/priorityqueue"
 )
 
 var input *os.File
@@ -72,8 +75,8 @@ type Gain struct {
 	video, cache int
 }
 
-var Gains []Gain
-var HighestGain Gain
+var Gains map[string]Gain
+var HighestGains *priorityqueue.PriorityQueue
 
 // type GainByImportance []Gain
 
@@ -83,9 +86,11 @@ var HighestGain Gain
 
 // func (g GainByImportance) Less(i, j int) bool { return g[i].value < g[j].value }
 
-func calculateGains() {
-	Gains = nil
-	HighestGain = Gain{-1, 0, 0}
+func calculateGains(ciu, viu int) {
+	newGains := make(map[string]Gain)
+	if HighestGains == nil {
+		HighestGains = &priorityqueue.PriorityQueue{}
+	}
 
 	for ci, c := range Caches {
 		es := c.e
@@ -94,7 +99,14 @@ func calculateGains() {
 				continue
 			}
 
+			key := strconv.Itoa(ci) + "," + strconv.Itoa(vi)
 			g := 0
+
+			if ciu != -1 && ci != ciu && vi != viu {
+				newGains[key] = Gains[key]
+				continue
+			}
+
 			for e, elc := range es {
 				if n, ok := Endpoints[e].P[vi]; ok {
 					diff := n * (Endpoints[e].Ld - elc)
@@ -105,49 +117,46 @@ func calculateGains() {
 				}
 			}
 			gain := Gain{g, vi, ci}
-			Gains = append(Gains, gain)
-
-			if g > HighestGain.value {
-				HighestGain = gain
-			}
+			newGains[key] = gain
+			HighestGains.Add(key, gain.value)
 		}
 	}
+
+	Gains = newGains
 }
 
-func updateGains(ciu, viu int) {
-	if HighestGain.cache == ciu || HighestGain.video == viu {
-		HighestGain = Gain{-1, 0, 0}
-	}
+// func updateGains(ciu, viu int) {
+// 	HighestGain = Gain{-1, 0, 0}
 
-	for ci, c := range Caches {
-		es := c.e
-		for vi, v := range Videos {
-			if ci != ciu && vi != viu {
-				continue
-			}
-			if v > c.size || inCache(ci, vi) {
-				continue
-			}
+// 	for ci, c := range Caches {
+// 		es := c.e
+// 		for vi, v := range Videos {
+// 			if ci != ciu && vi != viu {
+// 				continue
+// 			}
+// 			if v > c.size || inCache(ci, vi) {
+// 				continue
+// 			}
 
-			g := 0
-			for e, elc := range es {
-				if n, ok := Endpoints[e].P[vi]; ok {
-					diff := n * (Endpoints[e].Ld - elc)
-					if diff < 0 {
-						continue
-					}
-					g += diff
-				}
-			}
-			gain := Gain{g, vi, ci}
-			Gains = append(Gains, gain)
+// 			g := 0
+// 			for e, elc := range es {
+// 				if n, ok := Endpoints[e].P[vi]; ok {
+// 					diff := n * (Endpoints[e].Ld - elc)
+// 					if diff < 0 {
+// 						continue
+// 					}
+// 					g += diff
+// 				}
+// 			}
+// 			gain := Gain{g, vi, ci}
+// 			Gains = append(Gains, gain)
 
-			if g > HighestGain.value {
-				HighestGain = gain
-			}
-		}
-	}
-}
+// 			if g > HighestGain.value {
+// 				HighestGain = gain
+// 			}
+// 		}
+// 	}
+// }
 
 func main() {
 	sample := os.Args[1]
@@ -215,12 +224,22 @@ func solve() interface{} {
 	previousLeft := totalLeft + 1
 	counter := 0
 
-	calculateGains()
+	calculateGains(-1, -1)
+	// fmt.Println(HighestGains)
+	// fmt.Println(Gains)
 	for {
-		if HighestGain.value == -1 {
+		keyi, _ := HighestGains.Pop()
+		fmt.Println("keyi:", keyi)
+		if keyi == -1 {
 			break
 		}
+		key, _ := keyi.(string)
+		HighestGain := Gains[key]
 		// fmt.Println(HighestGain)
+
+		if Caches[HighestGain.cache].size-Videos[HighestGain.video] < 0 {
+			continue
+		}
 
 		// fmt.Println("HighestGain:", HighestGain)
 		// fmt.Println("Gains:", Gains)
@@ -250,7 +269,7 @@ func solve() interface{} {
 			counter = 0
 		}
 
-		updateGains(HighestGain.cache, HighestGain.video)
+		calculateGains(HighestGain.cache, HighestGain.video)
 	}
 
 	fmt.Fprintf(output, "%d\n", C)
