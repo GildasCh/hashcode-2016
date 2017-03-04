@@ -112,10 +112,12 @@ func (cl CacheLatency) Swap(i, j int) {
 
 func (cl CacheLatency) Less(i, j int) bool { return cl.lat[i] < cl.lat[j] }
 
+var fileOut string
+
 func main() {
 	sample := os.Args[1]
 	fileIn := sample + ".in"
-	fileOut := sample + ".out"
+	fileOut = sample + ".out"
 
 	var err error
 	input, err = os.Open(fileIn)
@@ -183,7 +185,7 @@ func solve() interface{} {
 
 	calculateGains()
 	// return nil
-	for obiais := 0; obiais < 1000; obiais++ {
+	for obiais := 0; obiais < 1000000; obiais++ {
 		biais := obiais
 		totalGain = 0
 		createCaches()
@@ -210,6 +212,15 @@ func solve() interface{} {
 		if totalGain > bestGain {
 			bestGain = totalGain
 			bestBiais = obiais
+			output, _ = os.Create(fileOut)
+			fmt.Fprintf(output, "%d\n", C)
+			for ci, c := range Caches {
+				fmt.Fprintf(output, "%d", ci)
+				for _, vi := range c.v {
+					fmt.Fprintf(output, " %d", vi)
+				}
+				fmt.Fprintf(output, "\n")
+			}
 		}
 	}
 
@@ -235,6 +246,7 @@ func solve() interface{} {
 		totalGain += g.value
 	}
 
+	output, _ = os.Create(fileOut)
 	fmt.Fprintf(output, "%d\n", C)
 	for ci, c := range Caches {
 		fmt.Fprintf(output, "%d", ci)
