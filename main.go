@@ -72,7 +72,7 @@ func (g GainByImportance) Len() int { return len(g) }
 
 func (g GainByImportance) Swap(i, j int) { g[i], g[j] = g[j], g[i] }
 
-func (g GainByImportance) Less(i, j int) bool { return g[i].value < g[j].value }
+func (g GainByImportance) Less(i, j int) bool { return g[i].value > g[j].value }
 
 func calculateGains() {
 	for _, p := range Predictions {
@@ -85,10 +85,18 @@ func calculateGains() {
 		sort.Sort(cls)
 		currentLat := e.Ld
 		for i := 0; i < cls.Len(); i++ {
+			diff := currentLat - cls.lat[i]
+			if diff < 0 {
+				continue
+			}
 			Gains = append(Gains, Gain{p.n * (currentLat - cls.lat[i]), p.v, cls.id[i]})
 			currentLat = cls.lat[i]
 		}
 	}
+
+	// fmt.Println(Gains)
+	sort.Sort(GainByImportance(Gains))
+	// fmt.Println(Gains)
 }
 
 type CacheLatency struct {
@@ -161,18 +169,54 @@ func main() {
 
 var totalGain = 0
 
+var bestGain = 0
+var bestBiais = -1
+
 func solve() interface{} {
 	// fmt.Printf("Videos: %+v\n", Videos)
 	// fmt.Printf("Endpoints: %+v\n", Endpoints)
 	// fmt.Printf("Predictions: %+v\n", Predictions)
 
-	createCaches()
-
-	totalLeft := sizeLeft()
+	// totalLeft := sizeLeft()
 	// previousLeft := totalLeft + 1
 	// counter := 0
 
 	calculateGains()
+	// return nil
+	for obiais := 0; obiais < 1000; obiais++ {
+		biais := obiais
+		totalGain = 0
+		createCaches()
+
+		for _, g := range Gains {
+			if Caches[g.cache].size-Videos[g.video] < 0 {
+				continue
+			}
+			if inCache(g.cache, g.video) {
+				continue
+			}
+
+			if biais%2 == 1 {
+				biais /= 2
+				continue
+			}
+
+			Caches[g.cache].v = append(Caches[g.cache].v, g.video)
+			Caches[g.cache].size -= Videos[g.video]
+			totalGain += g.value
+		}
+
+		// fmt.Println("Biais:", obiais, "Total Gain:", totalGain)
+		if totalGain > bestGain {
+			bestGain = totalGain
+			bestBiais = obiais
+		}
+	}
+
+	biais := bestBiais
+	totalGain = 0
+	createCaches()
+
 	for _, g := range Gains {
 		if Caches[g.cache].size-Videos[g.video] < 0 {
 			continue
@@ -181,27 +225,14 @@ func solve() interface{} {
 			continue
 		}
 
+		if biais%2 == 1 {
+			biais /= 2
+			continue
+		}
+
 		Caches[g.cache].v = append(Caches[g.cache].v, g.video)
 		Caches[g.cache].size -= Videos[g.video]
 		totalGain += g.value
-
-		// previousLeft = totalLeft
-		totalLeft = sizeLeft()
-
-		fmt.Println(totalLeft, "/", X*C)
-		// fmt.Println(Caches)
-		// if totalLeft == previousLeft {
-		// 	// fmt.Println("Caches:", Caches)
-		// 	// fmt.Println("HighestGain:", HighestGain)
-		// 	counter++
-		// 	if counter > 50000 {
-		// 		break
-		// 	}
-		// } else {
-		// 	counter = 0
-		// }
-
-		// calculateGains(HighestGain.cache, HighestGain.video)
 	}
 
 	fmt.Fprintf(output, "%d\n", C)
@@ -213,6 +244,7 @@ func solve() interface{} {
 		fmt.Fprintf(output, "\n")
 	}
 
+	fmt.Println("Best biais:", bestBiais, bestGain)
 	fmt.Println("Total Gain:", totalGain)
 
 	return 0
