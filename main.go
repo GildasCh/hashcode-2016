@@ -158,6 +158,9 @@ func main() {
 
 	solve()
 }
+
+var totalGain = 0
+
 func solve() interface{} {
 	// fmt.Printf("Videos: %+v\n", Videos)
 	// fmt.Printf("Endpoints: %+v\n", Endpoints)
@@ -166,8 +169,8 @@ func solve() interface{} {
 	createCaches()
 
 	totalLeft := sizeLeft()
-	previousLeft := totalLeft + 1
-	counter := 0
+	// previousLeft := totalLeft + 1
+	// counter := 0
 
 	calculateGains()
 	for _, g := range Gains {
@@ -180,22 +183,23 @@ func solve() interface{} {
 
 		Caches[g.cache].v = append(Caches[g.cache].v, g.video)
 		Caches[g.cache].size -= Videos[g.video]
+		totalGain += g.value
 
-		previousLeft = totalLeft
+		// previousLeft = totalLeft
 		totalLeft = sizeLeft()
 
 		fmt.Println(totalLeft, "/", X*C)
 		// fmt.Println(Caches)
-		if totalLeft == previousLeft {
-			// fmt.Println("Caches:", Caches)
-			// fmt.Println("HighestGain:", HighestGain)
-			counter++
-			if counter > 50000 {
-				break
-			}
-		} else {
-			counter = 0
-		}
+		// if totalLeft == previousLeft {
+		// 	// fmt.Println("Caches:", Caches)
+		// 	// fmt.Println("HighestGain:", HighestGain)
+		// 	counter++
+		// 	if counter > 50000 {
+		// 		break
+		// 	}
+		// } else {
+		// 	counter = 0
+		// }
 
 		// calculateGains(HighestGain.cache, HighestGain.video)
 	}
@@ -208,6 +212,8 @@ func solve() interface{} {
 		}
 		fmt.Fprintf(output, "\n")
 	}
+
+	fmt.Println("Total Gain:", totalGain)
 
 	return 0
 }
