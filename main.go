@@ -277,7 +277,7 @@ func solve() interface{} {
 			counter = 0
 		}
 
-		calculateGains(HighestGain.cache, HighestGain.video)
+		// calculateGains(HighestGain.cache, HighestGain.video)
 	}
 
 	fmt.Fprintf(output, "%d\n", C)
