@@ -86,11 +86,16 @@ var HighestGains *priorityqueue.PriorityQueue
 
 // func (g GainByImportance) Less(i, j int) bool { return g[i].value < g[j].value }
 
+var sanityCounter int
+
 func calculateGains(ciu, viu int) {
 	newGains := make(map[string]Gain)
-	if HighestGains == nil {
+	if HighestGains == nil || sanityCounter > 1000 {
 		HighestGains = &priorityqueue.PriorityQueue{}
+		sanityCounter = 0
+		ciu, viu = -1, -1
 	}
+	sanityCounter++
 
 	for ci, c := range Caches {
 		es := c.e
@@ -229,7 +234,7 @@ func solve() interface{} {
 	// fmt.Println(Gains)
 	for {
 		keyi, _ := HighestGains.Pop()
-		fmt.Println("keyi:", keyi)
+		// fmt.Println("keyi:", keyi)
 		if keyi == -1 {
 			break
 		}
@@ -238,6 +243,9 @@ func solve() interface{} {
 		// fmt.Println(HighestGain)
 
 		if Caches[HighestGain.cache].size-Videos[HighestGain.video] < 0 {
+			continue
+		}
+		if inCache(HighestGain.cache, HighestGain.video) {
 			continue
 		}
 
