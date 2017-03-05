@@ -113,6 +113,21 @@ func (cl CacheLatency) Swap(i, j int) {
 
 func (cl CacheLatency) Less(i, j int) bool { return cl.lat[i] < cl.lat[j] }
 
+func calculateTotalLat() int {
+	tot := 0
+	for _, p := range Predictions {
+		e := Endpoints[p.e]
+		bestLat := e.Ld
+		for ci, lc := range e.Lc {
+			if lc < bestLat && inCache(ci, p.v) {
+				bestLat = lc
+			}
+		}
+		tot += bestLat * p.n
+	}
+	return tot
+}
+
 var fileOut string
 var bFrom, bTo int
 
@@ -178,10 +193,15 @@ func main() {
 
 var totalGain = 0
 
-var bestGain = 0
+var bestLat = -1
 var bestBiais = -1
 
 func solve() interface{} {
+	for ei, e := range Endpoints {
+		fmt.Println(ei, e.Lc)
+	}
+	return nil
+
 	// fmt.Printf("Videos: %+v\n", Videos)
 	// fmt.Printf("Endpoints: %+v\n", Endpoints)
 	// fmt.Printf("Predictions: %+v\n", Predictions)
@@ -209,15 +229,17 @@ func solve() interface{} {
 				biais /= 2
 				continue
 			}
+			biais /= 2
 
 			Caches[g.cache].v = append(Caches[g.cache].v, g.video)
 			Caches[g.cache].size -= Videos[g.video]
 			totalGain += g.value
 		}
 
-		// fmt.Println("Biais:", obiais, "Total Gain:", totalGain)
-		if totalGain > bestGain {
-			bestGain = totalGain
+		totalLatency := calculateTotalLat()
+		if bestLat == -1 || totalLatency < bestLat {
+			fmt.Println("New best Biais:", obiais, "Total Lat:", totalLatency)
+			bestLat = totalLatency
 			bestBiais = obiais
 			output, _ = os.Create(fileOut)
 			fmt.Fprintf(output, "%d\n", C)
@@ -263,7 +285,7 @@ func solve() interface{} {
 		fmt.Fprintf(output, "\n")
 	}
 
-	fmt.Println("Best biais:", bestBiais, bestGain)
+	fmt.Println("Best biais:", bestBiais, bestLat)
 	fmt.Println("Total Gain:", totalGain)
 
 	return 0
