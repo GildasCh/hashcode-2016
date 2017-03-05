@@ -78,7 +78,7 @@ type ByWeight []weightvideo
 
 func (a ByWeight) Len() int           { return len(a) }
 func (a ByWeight) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByWeight) Less(i, j int) bool { return a[i].weight < a[j].weight }
+func (a ByWeight) Less(i, j int) bool { return a[i].weight > a[j].weight }
 
 func removeDuplicates(a []int) []int {
 	result := []int{}
