@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 )
 
 var input *os.File
@@ -23,7 +24,6 @@ type Endpoint struct {
 	Ld int         // Latency to datacenter
 	Lc map[int]int // Caches: id -> Lc
 	P  map[int]int // Predictions: id video -> number of view
-	Pl map[int]int // Predictions: id video -> current latency
 }
 
 type Prediction struct {
@@ -31,7 +31,8 @@ type Prediction struct {
 }
 
 type Cache struct {
-	Endpoints []int
+	Endpoints         []int
+	EndpointsPNumbers int
 }
 
 func CacheInts() []int {
@@ -47,7 +48,7 @@ type CacheByEndpoint []int
 func (c CacheByEndpoint) Len() int      { return len(c) }
 func (c CacheByEndpoint) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
 func (c CacheByEndpoint) Less(i, j int) bool {
-	return len(Caches[c[i]].Endpoints) < len(Caches[c[j]].Endpoints)
+	return Caches[c[i]].EndpointsPNumbers < Caches[c[j]].EndpointsPNumbers
 }
 
 func CacheFromEndpoints(C int, E []Endpoint) []Cache {
@@ -56,6 +57,7 @@ func CacheFromEndpoints(C int, E []Endpoint) []Cache {
 	for i, e := range E {
 		for c, _ := range e.Lc {
 			ret[c].Endpoints = append(ret[c].Endpoints, i)
+			ret[c].EndpointsPNumbers += len(e.P)
 		}
 	}
 	return ret
@@ -65,7 +67,6 @@ func CacheFromEndpoints(C int, E []Endpoint) []Cache {
 func AddPredictions() {
 	for _, p := range Predictions {
 		Endpoints[p.e].P[p.v] = p.n
-		Endpoints[p.e].Pl[p.v] = Endpoints[p.e].Ld
 	}
 }
 
@@ -99,7 +100,7 @@ func interestingVids(idcache int) (idvids []int) {
 		// from Predictions, extract the videos for a given endpoint
 		e := &Endpoints[iEndpoint]
 		for idvideo, n := range e.P {
-			videos = append(videos, weightvideo{idvideo, n * (e.Pl[idvideo] - e.Lc[idcache])})
+			videos = append(videos, weightvideo{idvideo, n * (bestRoute(iEndpoint, idvideo) - e.Lc[idcache])})
 		}
 	}
 
@@ -112,6 +113,23 @@ func interestingVids(idcache int) (idvids []int) {
 	idvids = removeDuplicates(idvids)
 
 	return idvids
+}
+
+var BestRoutes = make(map[string]int)
+
+func addRoute(ei, vi, lat int) {
+	key := strconv.Itoa(ei) + "," + strconv.Itoa(vi)
+	if current, ok := BestRoutes[key]; !ok || (ok && current > lat) {
+		BestRoutes[key] = lat
+	}
+}
+
+func bestRoute(ei, vi int) int {
+	key := strconv.Itoa(ei) + "," + strconv.Itoa(vi)
+	if lat, ok := BestRoutes[key]; ok {
+		return lat
+	}
+	return Endpoints[ei].Ld
 }
 
 func main() {
@@ -154,7 +172,7 @@ func main() {
 			cid := readInt()
 			C[cid] = readInt()
 		}
-		Endpoints[i] = Endpoint{Ld, C, make(map[int]int), make(map[int]int)}
+		Endpoints[i] = Endpoint{Ld, C, make(map[int]int)}
 	}
 
 	// Predictions
@@ -171,7 +189,7 @@ func main() {
 
 func removeVidFromEnpoints(ci int, vi int) {
 	for _, ei := range Caches[ci].Endpoints {
-		Endpoints[ei].Pl[vi] = Endpoints[ei].Lc[ci]
+		addRoute(ei, vi, Endpoints[ei].Lc[ci])
 	}
 }
 
