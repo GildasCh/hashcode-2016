@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 )
 
 var input *os.File
@@ -113,11 +114,17 @@ func (cl CacheLatency) Swap(i, j int) {
 func (cl CacheLatency) Less(i, j int) bool { return cl.lat[i] < cl.lat[j] }
 
 var fileOut string
+var bFrom, bTo int
 
 func main() {
 	sample := os.Args[1]
 	fileIn := sample + ".in"
 	fileOut = sample + ".out"
+
+	bFroms := os.Args[2]
+	bTos := os.Args[3]
+	bFrom, _ = strconv.Atoi(bFroms)
+	bTo, _ = strconv.Atoi(bTos)
 
 	var err error
 	input, err = os.Open(fileIn)
@@ -185,7 +192,7 @@ func solve() interface{} {
 
 	calculateGains()
 	// return nil
-	for obiais := 0; obiais < 1000000; obiais++ {
+	for obiais := bFrom; obiais < bTo; obiais++ {
 		biais := obiais
 		totalGain = 0
 		createCaches()
