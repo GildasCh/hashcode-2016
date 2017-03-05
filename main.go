@@ -48,7 +48,7 @@ type CacheByEndpoint []int
 func (c CacheByEndpoint) Len() int      { return len(c) }
 func (c CacheByEndpoint) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
 func (c CacheByEndpoint) Less(i, j int) bool {
-	return Caches[c[i]].EndpointsPNumbers < Caches[c[j]].EndpointsPNumbers
+	return Caches[c[i]].EndpointsPNumbers > Caches[c[j]].EndpointsPNumbers
 }
 
 func CacheFromEndpoints(C int, E []Endpoint) []Cache {
@@ -91,7 +91,7 @@ func interestingVids(idcache int) (idvids []int) {
 		// from Predictions, extract the videos for a given endpoint
 		e := &Endpoints[iEndpoint]
 		for idvideo, n := range e.P {
-			byweight.weights[idvideo] += n * (bestRoute(iEndpoint, idvideo) - e.Lc[idcache]) * 2 / Videos[idvideo]
+			byweight.weights[idvideo] += n * (bestRoute(iEndpoint, idvideo) - e.Lc[idcache]) / Videos[idvideo]
 		}
 	}
 
