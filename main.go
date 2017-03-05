@@ -75,44 +75,34 @@ type weightvideo struct {
 	weight  int
 }
 
-type ByWeight []weightvideo
-
-func (a ByWeight) Len() int           { return len(a) }
-func (a ByWeight) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByWeight) Less(i, j int) bool { return a[i].weight > a[j].weight }
-
-func removeDuplicates(a []int) []int {
-	result := []int{}
-	seen := map[int]int{}
-	for _, val := range a {
-		if _, ok := seen[val]; !ok {
-			result = append(result, val)
-			seen[val] = val
-		}
-	}
-	return result
+type ByWeight struct {
+	weights map[int]int
+	idvids  []int
 }
 
+func (a *ByWeight) Len() int           { return len(a.idvids) }
+func (a *ByWeight) Swap(i, j int)      { a.idvids[i], a.idvids[j] = a.idvids[j], a.idvids[i] }
+func (a *ByWeight) Less(i, j int) bool { return a.weights[a.idvids[i]] > a.weights[a.idvids[j]] }
+
 func interestingVids(idcache int) (idvids []int) {
-	var videos []weightvideo
+	byweight := &ByWeight{make(map[int]int), nil}
 
 	for _, iEndpoint := range Caches[idcache].Endpoints {
 		// from Predictions, extract the videos for a given endpoint
 		e := &Endpoints[iEndpoint]
 		for idvideo, n := range e.P {
-			videos = append(videos, weightvideo{idvideo, n * (bestRoute(iEndpoint, idvideo) - e.Lc[idcache])})
+			byweight.weights[idvideo] += n * (bestRoute(iEndpoint, idvideo) - e.Lc[idcache]) * 2 / Videos[idvideo]
 		}
 	}
 
-	sort.Sort(ByWeight(videos))
-
-	for _, iv := range videos {
-		idvids = append(idvids, iv.idvideo)
+	for iv, _ := range byweight.weights {
+		byweight.idvids = append(byweight.idvids, iv)
 	}
 
-	idvids = removeDuplicates(idvids)
+	sort.Sort(byweight)
 
-	return idvids
+	// fmt.Println(byweight)
+	return byweight.idvids
 }
 
 var BestRoutes = make(map[string]int)
