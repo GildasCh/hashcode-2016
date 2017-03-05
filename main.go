@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"sort"
+	"time"
 )
 
 var input *os.File
@@ -15,7 +17,7 @@ var R int
 var C int
 var X int
 var Videos []int
-var Endpoints []Endpoint
+var Endpoints []*Endpoint
 var Predictions []Prediction
 var Caches []Cache
 
@@ -47,10 +49,10 @@ type CacheByEndpoint []int
 func (c CacheByEndpoint) Len() int      { return len(c) }
 func (c CacheByEndpoint) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
 func (c CacheByEndpoint) Less(i, j int) bool {
-	return len(Caches[c[i]].Endpoints) < len(Caches[c[j]].Endpoints)
+	return rand.Intn(1)%1 == 0
 }
 
-func CacheFromEndpoints(C int, E []Endpoint) []Cache {
+func CacheFromEndpoints(C int, E []*Endpoint) []Cache {
 	ret := make([]Cache, C)
 
 	for i, e := range E {
@@ -63,6 +65,10 @@ func CacheFromEndpoints(C int, E []Endpoint) []Cache {
 
 // Add predictions to E
 func AddPredictions() {
+	for _, e := range Endpoints {
+		e.P = make(map[int]int)
+		e.Pl = make(map[int]int)
+	}
 	for _, p := range Predictions {
 		Endpoints[p.e].P[p.v] = p.n
 		Endpoints[p.e].Pl[p.v] = Endpoints[p.e].Ld
@@ -97,7 +103,7 @@ func interestingVids(idcache int) (idvids []int) {
 
 	for _, iEndpoint := range Caches[idcache].Endpoints {
 		// from Predictions, extract the videos for a given endpoint
-		e := &Endpoints[iEndpoint]
+		e := Endpoints[iEndpoint]
 		for idvideo, n := range e.P {
 			videos = append(videos, weightvideo{idvideo, n * (e.Pl[idvideo] - e.Lc[idcache])})
 		}
@@ -114,10 +120,14 @@ func interestingVids(idcache int) (idvids []int) {
 	return idvids
 }
 
+var fileOut string
+
 func main() {
 	sample := os.Args[1]
 	fileIn := sample + ".in"
-	fileOut := sample + ".out"
+	fileOut = sample + ".out"
+
+	rand.Seed(time.Now().Unix())
 
 	var err error
 	input, err = os.Open(fileIn)
@@ -145,7 +155,7 @@ func main() {
 	}
 
 	// Endpoints
-	Endpoints = make([]Endpoint, E)
+	Endpoints = make([]*Endpoint, E)
 	for i := 0; i < E; i++ {
 		Ld := readInt()
 		K := readInt()
@@ -154,7 +164,7 @@ func main() {
 			cid := readInt()
 			C[cid] = readInt()
 		}
-		Endpoints[i] = Endpoint{Ld, C, make(map[int]int), make(map[int]int)}
+		Endpoints[i] = &Endpoint{Ld, C, nil, nil}
 	}
 
 	// Predictions
@@ -175,37 +185,68 @@ func removeVidFromEnpoints(ci int, vi int) {
 	}
 }
 
+func calculateTotalLat() int {
+	tot := 0
+	for _, p := range Predictions {
+		e := Endpoints[p.e]
+		bestLat := e.Ld
+		for ci, lc := range e.Lc {
+			if lc < bestLat && inOutputCache(ci, p.v) {
+				bestLat = lc
+			}
+		}
+		tot += bestLat * p.n
+	}
+	return tot
+}
+
+var bestLat = -1
+
 func solve() interface{} {
 	//
 
-	AddPredictions()
+	for {
+		AddPredictions()
 
-	// fmt.Printf("V %d E %d R %d C %d X %d\n\n", V, E, R, C, X)
-	// fmt.Printf("Videos: %v\n\nEndpoints: %+v\n\nPredictions: %+v\n\n", Videos, Endpoints, Predictions)
+		// fmt.Printf("V %d E %d R %d C %d X %d\n\n", V, E, R, C, X)
+		// fmt.Printf("Videos: %v\n\nEndpoints: %+v\n\nPredictions: %+v\n\n", Videos, Endpoints, Predictions)
 
-	Caches = CacheFromEndpoints(C, Endpoints)
-	// fmt.Printf("Caches: %v\n\n", Caches)
+		Caches = CacheFromEndpoints(C, Endpoints)
+		// fmt.Printf("Caches: %v\n\n", Caches)
 
-	cacheSorted := CacheInts()
-	sort.Sort(CacheByEndpoint(cacheSorted))
-	// fmt.Printf("Caches order: %v\n\n", cacheSorted)
+		cacheSorted := CacheInts()
+		sort.Sort(CacheByEndpoint(cacheSorted))
+		// fmt.Printf("Caches order: %v\n\n", cacheSorted)
 
-	fmt.Fprintf(output, "%d\n", C)
-	for _, ci := range cacheSorted {
-		fmt.Fprintf(output, "%d", ci)
-		iVids := interestingVids(ci)
-		// fmt.Printf("Interesting vids: %v\n\n", iVids)
-		sizeCache := X
-		for _, iv := range iVids {
-			if Videos[iv] > sizeCache {
-				continue
+		createOutputCaches()
+		for _, ci := range cacheSorted {
+			iVids := interestingVids(ci)
+			for _, iv := range iVids {
+				if Videos[iv] > OutputCaches[ci].size {
+					continue
+				}
+				OutputCaches[ci].v = append(OutputCaches[ci].v, iv)
+				OutputCaches[ci].size -= Videos[iv]
+				// Remove from endpoints
+				removeVidFromEnpoints(ci, iv)
 			}
-			fmt.Fprintf(output, " %d", iv)
-			sizeCache -= Videos[iv]
-			// Remove from endpoints
-			removeVidFromEnpoints(ci, iv)
 		}
-		fmt.Fprintf(output, "\n")
+
+		totalLatency := calculateTotalLat()
+		fmt.Printf("Total Lat: %d\r", totalLatency)
+		if bestLat == -1 || totalLatency < bestLat {
+			fmt.Println("\nNew best total Lat:", totalLatency)
+			bestLat = totalLatency
+			output, _ = os.Create(fileOut)
+			fmt.Fprintf(output, "%d\n", C)
+			for ci, c := range OutputCaches {
+				fmt.Fprintf(output, "%d", ci)
+				for _, vi := range c.v {
+					fmt.Fprintf(output, " %d", vi)
+				}
+				fmt.Fprintf(output, "\n")
+			}
+		}
 	}
 
 	return 0
@@ -227,4 +268,36 @@ func readFloat() float64 {
 	var x float64
 	fmt.Fscanf(input, "%f", &x)
 	return x
+}
+
+type OutputCache struct {
+	size int
+	v    []int
+}
+
+var OutputCaches []OutputCache
+
+func createOutputCaches() {
+	OutputCaches = make([]OutputCache, C)
+	for i := 0; i < C; i++ {
+		OutputCaches[i] = OutputCache{X, nil}
+	}
+}
+
+func sizeLeft() int {
+	ret := 0
+	for _, c := range OutputCaches {
+		ret += X - c.size
+	}
+	return ret
+}
+
+func inOutputCache(ci int, vi int) bool {
+	ret := false
+	for _, cvi := range OutputCaches[ci].v {
+		if cvi == vi {
+			ret = true
+		}
+	}
+	return ret
 }
