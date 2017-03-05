@@ -95,7 +95,7 @@ func removeDuplicates(a []int) []int {
 func interestingVids(idcache int) (idvids []int) {
 	var videos []weightvideo
 
-	for iEndpoint := range Caches[idcache].Endpoints {
+	for _, iEndpoint := range Caches[idcache].Endpoints {
 		// from Predictions, extract the videos for a given endpoint
 		e := &Endpoints[iEndpoint]
 		for idvideo, n := range e.P {
