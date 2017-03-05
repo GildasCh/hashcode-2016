@@ -23,6 +23,7 @@ type Endpoint struct {
 	Ld int         // Latency to datacenter
 	Lc map[int]int // Caches: id -> Lc
 	P  map[int]int // Predictions: id video -> number of view
+	Pl map[int]int // Predictions: id video -> current latency
 }
 
 type Prediction struct {
@@ -43,14 +44,8 @@ func CacheInts() []int {
 
 type CacheByEndpoint []int
 
-func (c CacheByEndpoint) Len() int {
-	return len(c)
-}
-
-func (c CacheByEndpoint) Swap(i, j int) {
-	c[i], c[j] = c[j], c[i]
-}
-
+func (c CacheByEndpoint) Len() int      { return len(c) }
+func (c CacheByEndpoint) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
 func (c CacheByEndpoint) Less(i, j int) bool {
 	return len(Caches[c[i]].Endpoints) < len(Caches[c[j]].Endpoints)
 }
@@ -70,6 +65,7 @@ func CacheFromEndpoints(C int, E []Endpoint) []Cache {
 func AddPredictions() {
 	for _, p := range Predictions {
 		Endpoints[p.e].P[p.v] = p.n
+		Endpoints[p.e].Pl[p.v] = Endpoints[p.e].Ld
 	}
 }
 
@@ -103,7 +99,7 @@ func interestingVids(idcache int) (idvids []int) {
 		// from Predictions, extract the videos for a given endpoint
 		e := &Endpoints[iEndpoint]
 		for idvideo, n := range e.P {
-			videos = append(videos, weightvideo{idvideo, n * (e.Ld - e.Lc[idcache])})
+			videos = append(videos, weightvideo{idvideo, n * (e.Pl[idvideo] - e.Lc[idcache])})
 		}
 	}
 
@@ -158,7 +154,7 @@ func main() {
 			cid := readInt()
 			C[cid] = readInt()
 		}
-		Endpoints[i] = Endpoint{Ld, C, make(map[int]int)}
+		Endpoints[i] = Endpoint{Ld, C, make(map[int]int), make(map[int]int)}
 	}
 
 	// Predictions
@@ -170,16 +166,16 @@ func main() {
 		Predictions[i] = Prediction{v, e, n}
 	}
 
-	solve(V, E, R, C, X, Videos, Endpoints, Predictions)
+	solve()
 }
 
 func removeVidFromEnpoints(ci int, vi int) {
 	for _, ei := range Caches[ci].Endpoints {
-		delete(Endpoints[ei].P, vi)
+		Endpoints[ei].Pl[vi] = Endpoints[ei].Lc[ci]
 	}
 }
 
-func solve(V, E, R, C, X int, Videos []int, Endpoints []Endpoint, Predictions []Prediction) interface{} {
+func solve() interface{} {
 	//
 
 	AddPredictions()
